@@ -1,6 +1,5 @@
 package com.example.mobile_development_project_group_1
 
-import androidx.activity.ComponentActivity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -9,7 +8,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -62,7 +60,6 @@ fun MainScaffoldView() {
 fun TopBarView(navController: NavHostController, scState: ScaffoldState) {
 
     val scope = rememberCoroutineScope()
-    val userVM = viewModel<UserViewModel>()
 
     Row(
         modifier = Modifier
@@ -86,11 +83,6 @@ fun TopBarView(navController: NavHostController, scState: ScaffoldState) {
             contentDescription = "note",
             modifier = Modifier.clickable { navController.navigate(SIGNUP_ROUTE) }
         )
-        if (Firebase.auth.currentUser?.uid.toString().isEmpty()) {
-            OutlinedButton(onClick = { userVM.logout() }) {
-                Text(text = "Log out")
-            }
-        }
     }
 }
 
@@ -99,7 +91,7 @@ fun MainContentView(navController: NavHostController) {
     NavHost(navController = navController, startDestination = HOME_ROUTE ) {
         composable(route = HOME_ROUTE) { HomeView() }
         composable(route = NOTE_ROUTE) { NoteView() }
-        composable(route = SIGNUP_ROUTE) { LoginView(UserViewModel()) }
+        composable(route = SIGNUP_ROUTE) { LoginView(UserViewModel(), navController) }
         composable(route = PROFILE_ROUTE) { ProfilePageView() }
     }
 }
@@ -159,31 +151,92 @@ fun BottomBarView(navController: NavHostController) {
 @Composable
 fun DrawerLayoutView(navController: NavHostController, scState: ScaffoldState) {
 
-    //val userVM = viewModel<UserViewModel>()
+    val userVM = viewModel<UserViewModel>()
     val scope = rememberCoroutineScope()
 
-    OutlinedButton(
-        onClick = {
-            navController.navigate(PROFILE_ROUTE)
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.SpaceBetween
+    ) {
+        OutlinedButton(
+            onClick = {
+                navController.navigate(PROFILE_ROUTE)
+                scope.launch {
+                    scState.drawerState.close()
+                }
+            },
+            modifier = Modifier
+                .padding(10.dp)
+        ) {
+            Text(text = "Profile page")
+        }
+
+        OutlinedButton(onClick = {
+            userVM.logout()
             scope.launch {
                 scState.drawerState.close()
             }
-        },
-        modifier = Modifier
-            .padding(10.dp)
-    ) {
-        Text(text = "Profile page")
+            navController.navigate(HOME_ROUTE)
+        }) {
+            Text(text = "Log out")
+        }
     }
+
 }
 
 @Composable
 fun ProfilePageView() {
-    Text(text = "Profile page")
+    val fireStore = Firebase.firestore
+    val fAuth = Firebase.auth
+
+    var currentUserFirstName by remember { mutableStateOf("") }
+    var currentUserLastName by remember { mutableStateOf("") }
+    var currentUserAddress by remember { mutableStateOf("") }
+    var currentUserPhoneNumber by remember { mutableStateOf("") }
+
+    var firstName by remember { mutableStateOf("") }
+    var lastName by remember { mutableStateOf("") }
+    var address by remember { mutableStateOf("") }
+    var phoneNumber by remember { mutableStateOf("") }
+
+    fireStore
+        .collection("users")
+        .document(fAuth.currentUser?.uid.toString())
+        .get()
+        .addOnSuccessListener {
+            currentUserFirstName = it.get("first_name").toString()
+            currentUserLastName = it.get("last_name").toString()
+            currentUserAddress = it.get("address").toString()
+            currentUserPhoneNumber = it.get("phone_num").toString()
+        }
+
+    Column() {
+        OutlinedTextField(
+            value = firstName,
+            onValueChange = { firstName = it },
+            placeholder = { Text(text = currentUserFirstName) }
+        )
+        OutlinedTextField(
+            value = lastName,
+            onValueChange = { lastName = it },
+            placeholder = { Text(text = currentUserLastName) }
+        )
+        OutlinedTextField(
+            value = address,
+            onValueChange = { address = it },
+            placeholder = { Text(text = currentUserAddress) }
+        )
+        OutlinedTextField(
+            value = phoneNumber,
+            onValueChange = { phoneNumber = it },
+            placeholder = { Text(text = currentUserPhoneNumber) }
+        )
+    }
 }
 
 
 @Composable
-fun LoginView(userVM: UserViewModel) {
+fun LoginView(userVM: UserViewModel, navController: NavHostController) {
     var email by remember { mutableStateOf("") }
     var pw by remember { mutableStateOf("") }
 
@@ -205,7 +258,10 @@ fun LoginView(userVM: UserViewModel) {
             visualTransformation = PasswordVisualTransformation()
         )
         OutlinedButton(
-            onClick = { userVM.loginUser(email, pw) },
+            onClick = {
+                userVM.loginUser(email, pw)
+                navController.navigate(HOME_ROUTE)
+            },
             modifier = Modifier
                 .padding(10.dp)
         ) {
