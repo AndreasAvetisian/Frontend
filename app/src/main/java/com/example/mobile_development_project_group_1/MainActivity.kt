@@ -13,7 +13,7 @@ class MainActivity : ComponentActivity() {
             MobileDevelopmentProjectGroup1Theme {
                 // A surface container using the 'background' color from the theme
                 Surface {
-                    MainView()
+                    MainScaffoldView()
                 }
             }
         }

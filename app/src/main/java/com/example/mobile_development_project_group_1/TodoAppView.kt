@@ -19,35 +19,49 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.google.firebase.auth.ktx.auth
+import com.google.firebase.firestore.ktx.firestore
+import com.google.firebase.ktx.Firebase
+import kotlinx.coroutines.launch
 
 const val HOME_ROUTE = "home"
 const val NOTE_ROUTE = "note"
+const val SIGNUP_ROUTE = "signUp"
+const val PROFILE_ROUTE = "profile"
+const val ADMIN_ROUTE = "ADMIN"
+const val MANAGER_ROUTE = "MANAGER"
+const val USER_ROUTE = "USER"
 
-@Composable
-fun MainView() {
-    val userVM = viewModel<UserViewModel>()
-
-    if (userVM.username.value.isEmpty()) {
-        LoginView(userVM)
-    } else {
-        MainScaffoldView()
-    }
-}
+//@Composable
+//fun MainView() {
+//    val userVM = viewModel<UserViewModel>()
+//    val fAuth = Firebase.auth
+//
+//    if (fAuth.currentUser?.uid?.isEmpty() == false) {
+//        MainScaffoldView()
+//    } else {
+//        LoginView(userVM = viewModel())
+//    }
+//}
 
 @Composable
 fun MainScaffoldView() {
-
     val navController = rememberNavController()
+    val scState = rememberScaffoldState( rememberDrawerState(DrawerValue.Closed) )
 
     Scaffold(
-        topBar = { TopBarView() },
+        scaffoldState = scState,
+        topBar = { TopBarView(navController, scState) },
         bottomBar = { BottomBarView(navController) },
-        content = { MainContentView(navController) }
+        content = { MainContentView(navController) },
+        drawerContent = { DrawerLayoutView(navController, scState) }
     )
 }
 
 @Composable
-fun TopBarView() {
+fun TopBarView(navController: NavHostController, scState: ScaffoldState) {
+
+    val scope = rememberCoroutineScope()
     val userVM = viewModel<UserViewModel>()
 
     Row(
@@ -58,9 +72,24 @@ fun TopBarView() {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        Text(text = userVM.username.value)
-        OutlinedButton(onClick = { userVM.logout() }) {
-            Text(text = "Log out")
+        Icon(
+            painter = painterResource( R.drawable.ic_menu ),
+            contentDescription = "note",
+            modifier = Modifier.clickable {
+                scope.launch {
+                    scState.drawerState.open()
+                }
+            }
+        )
+        Icon(
+            painter = painterResource( R.drawable.ic_login ),
+            contentDescription = "note",
+            modifier = Modifier.clickable { navController.navigate(SIGNUP_ROUTE) }
+        )
+        if (Firebase.auth.currentUser?.uid.toString().isEmpty()) {
+            OutlinedButton(onClick = { userVM.logout() }) {
+                Text(text = "Log out")
+            }
         }
     }
 }
@@ -70,57 +99,38 @@ fun MainContentView(navController: NavHostController) {
     NavHost(navController = navController, startDestination = HOME_ROUTE ) {
         composable(route = HOME_ROUTE) { HomeView() }
         composable(route = NOTE_ROUTE) { NoteView() }
+        composable(route = SIGNUP_ROUTE) { LoginView(UserViewModel()) }
+        composable(route = PROFILE_ROUTE) { ProfilePageView() }
     }
 }
 
 @Composable
 fun HomeView() {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-    ) {
-        Text(text = "This is home page")
+    val fireStore = Firebase.firestore
+    val fAuth = Firebase.auth
+    var currentUserRoute by remember { mutableStateOf("") }
+
+    fireStore
+        .collection("users")
+        .document(fAuth.currentUser?.uid.toString())
+        .get()
+        .addOnSuccessListener {
+            currentUserRoute = it.get("route").toString()
+        }
+
+    Column {
+        Text(text = "Main page")
+        when (currentUserRoute) {
+            ADMIN_ROUTE -> Text(text = "You are $currentUserRoute")
+            MANAGER_ROUTE -> Text(text = "You are $currentUserRoute")
+            USER_ROUTE -> Text(text = "You are $currentUserRoute")
+        }
     }
 }
 
 @Composable
 fun NoteView() {
-
-    var noteText by remember { mutableStateOf("") }
-    val noteVM = viewModel<NoteViewModel>(LocalContext.current as ComponentActivity)
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(10.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-
-        OutlinedTextField(
-            value = noteText,
-            onValueChange = { noteText = it },
-            label = { Text(text = "Todo note") }
-        )
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        OutlinedButton(
-            onClick = {
-                noteVM.addNote( Note(noteText) )
-            }
-        ) {
-            Text(text = "Add todo note")
-        }
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        noteVM.notes.value.forEach {
-            Divider(thickness = 2.dp)
-            Text(text = it.message)
-        }
-        Divider(thickness = 2.dp)
-
-    }
+    Text(text = "AAA")
 }
 
 @Composable
@@ -144,6 +154,31 @@ fun BottomBarView(navController: NavHostController) {
             modifier = Modifier.clickable { navController.navigate(NOTE_ROUTE) }
         )
     }
+}
+
+@Composable
+fun DrawerLayoutView(navController: NavHostController, scState: ScaffoldState) {
+
+    //val userVM = viewModel<UserViewModel>()
+    val scope = rememberCoroutineScope()
+
+    OutlinedButton(
+        onClick = {
+            navController.navigate(PROFILE_ROUTE)
+            scope.launch {
+                scState.drawerState.close()
+            }
+        },
+        modifier = Modifier
+            .padding(10.dp)
+    ) {
+        Text(text = "Profile page")
+    }
+}
+
+@Composable
+fun ProfilePageView() {
+    Text(text = "Profile page")
 }
 
 
